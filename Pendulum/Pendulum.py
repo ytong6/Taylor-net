@@ -9,14 +9,34 @@ import matplotlib.pyplot as plt
 import h5py
 import os
 import torch.utils.data
+import argparse
 
-#dimension
+
+
+def get_args():
+    parser = argparse.ArgumentParser(description=None)
+    parser.add_argument('--training_DT', default=1e-2, type=float, help='training period')
+    parser.add_argument('--predicting_DT', default=20*np.pi, type=float, help='predicting period')
+    parser.add_argument('--learning_rate', default=2e-3, type=float, help='learning rate')
+    parser.add_argument('--step_size', default=10, type=int, help='the period of learning rate decay')
+    parser.add_argument('--gamma', default=0.8, type=float, help='multiplicative factor of learning rate decay')
+    parser.add_argument('--epochs', default=300, type=int, help='number of epochs')
+    parser.add_argument('--print_every', default=10, type=int, help='number of epochs between prints and plots')
+    parser.add_argument('--plot_points', default=1000, type=int, help='number of points on each plot')
+    parser.add_argument('--training_samples', default=15, type=int, help='number of training samples')
+    parser.add_argument('--testing_samples', default=100, type=int, help='number of testing samples')
+    parser.add_argument('--noise', default=0, type=float, help='noise added on data')
+    parser.add_argument('--eps', default=1e-3, type=float, help='eps used in integrator')
+    parser.add_argument('--tol', default=1e-3, type=float, help='tolerance of neural network')
+    parser.add_argument('--use_ReLU', dest='use_ReLU', action='store_true', help='use relu as activation function')
+    parser.set_defaults(feature=True)
+    return parser.parse_args()
+
+# dimension
 d = 1
-
 
 def _check_none_zero(tensor, shape, device):
     return tensor.to(device) if tensor is not None else torch.zeros(*shape).to(device)
-
 
 def to_np(x):
     return x.detach().cpu().numpy()
@@ -32,7 +52,7 @@ def Taylor_act(x):
     return y
 
 
-def four_SymInt(p0, q0, t0, t1, Tp, Vq, eps=0.001):
+def four_SymInt(p0, q0, t0, t1, Tp, Vq, eps):
     n_steps = np.round((torch.abs(t1 - t0) / (eps * 4)).max().item())
     h = (t1 - t0) / n_steps
     kp = p0
@@ -53,20 +73,20 @@ def four_SymInt(p0, q0, t0, t1, Tp, Vq, eps=0.001):
     return kp, kq
 
 
-def plot_traj(obs=None, times=None, trajs=None, training_data=None):
+def plot_traj(prediction=None, times=None, true_trajs=None, training_data=None):
     plt.clf()
-    if obs is not None:
-        obs = to_np(obs)
-        plt.scatter(obs[:, 0], obs[:, 1], c=to_np(times.reshape(-1)))
+    if prediction is not None:
+        prediction = to_np(prediction)
+        plt.scatter(prediction[:, 0], prediction[:, 1], label='Prediction', c=to_np(times.reshape(-1)))
 
     if training_data is not None:
         training_data= to_np(training_data)
-        plt.plot(training_data[:, 0], training_data[:, 1], c='r',lw=4, label='Traning period',zorder=3)
+        plt.plot(training_data[:, 0], training_data[:, 1], c='r',lw=4, label='Training period',zorder=3)
 
-    if trajs is not None:
-        trajs = to_np(trajs)
+    if true_trajs is not None:
+        true_trajs = to_np(true_trajs)
 
-        plt.plot(trajs[:, 0], trajs[:, 1], lw=1.5,c='C0', label='True trajectory',zorder=2)
+        plt.plot(true_trajs[:, 0], true_trajs[:, 1], lw=1.5,c='C0', label='True trajectory',zorder=2)
 
     plt.title("",fontsize=22)
     plt.legend()
@@ -75,15 +95,16 @@ def plot_traj(obs=None, times=None, trajs=None, training_data=None):
 
 
 class TpTrained(nn.Module):
-    def __init__(self):
+    def __init__(self,args):
         super(TpTrained, self).__init__()
         self.nx = 8
         self.params_pos = nn.Parameter(torch.randn(self.nx, d, 128) * math.sqrt(2. / (d * 128.) / self.nx),
-                                       requires_grad=True)
+                                                    requires_grad=True)
         self.params_neg = nn.Parameter(torch.randn(self.nx, d, 128) * math.sqrt(2. / (d * 128.) / self.nx),
-                                       requires_grad=True)
-        self.b = nn.Parameter(torch.zeros(1, d), requires_grad=True)
+                                                    requires_grad=True)
+        self.b = nn.Parameter(torch.zeros(1,d), requires_grad=True)
         self.k = []
+        self.relu = args.use_ReLU
         k = 1
         for i in range(self.nx):
             k = k * (i + 1)
@@ -92,17 +113,24 @@ class TpTrained(nn.Module):
         self.pow = torch.tensor(range(1, self.nx + 1)).float().unsqueeze(-1).unsqueeze(-1)
 
     def forward(self, x):
-        y_pos = torch.matmul(x.unsqueeze(1), self.params_pos)
-        y_neg = torch.matmul(x.unsqueeze(1), self.params_neg)
-        z_pos = torch.pow(y_pos, self.pow) / self.k
-        z_neg = torch.pow(y_neg, self.pow) / self.k
-        return self.b - torch.matmul(z_neg, self.params_neg.transpose(1, 2)).sum() + torch.matmul(z_pos,
-                                                                                                  self.params_pos.transpose(
-                                                                                                      1, 2)).sum()
+
+        if self.relu:
+            act = nn.ReLU()
+            y1 = torch.matmul(x.unsqueeze(1), self.params_pos)
+            y2 = torch.matmul(x.unsqueeze(1), self.params_neg)
+            return self.b + torch.matmul(act(y1), self.params_pos.transpose(1, 2)).sum(dim=0) + torch.matmul(-act(y2), self.params_neg.transpose(1, 2)).sum(dim=0)
+        else:
+            y_pos = torch.matmul(x.unsqueeze(1), self.params_pos)
+            y_neg = torch.matmul(x.unsqueeze(1), self.params_neg)
+            z_pos = torch.pow(y_pos, self.pow) / self.k
+            z_neg = torch.pow(y_neg, self.pow) / self.k
+            return self.b - torch.matmul(z_neg, self.params_neg.transpose(1, 2)).sum() + torch.matmul(z_pos,
+                                                                                                      self.params_pos.transpose(
+                                                                                                          1, 2)).sum()
 
 
 class VqTrained(nn.Module):
-    def __init__(self):
+    def __init__(self,args):
         super(VqTrained, self).__init__()
         self.nx = 8
         self.params_pos = nn.Parameter(torch.randn(self.nx, d, 128) * math.sqrt(2. / (d * 128.) / self.nx),
@@ -111,6 +139,7 @@ class VqTrained(nn.Module):
                                        requires_grad=True)
         self.b = nn.Parameter(torch.zeros(1, d), requires_grad=True)
         self.k = []
+        self.relu = args.use_ReLU
         k = 1
         for i in range(self.nx):
             k = k * (i + 1)
@@ -119,21 +148,27 @@ class VqTrained(nn.Module):
         self.pow = torch.tensor(range(1, self.nx + 1)).float().unsqueeze(-1).unsqueeze(-1)
 
     def forward(self, x):
-        y_pos = torch.matmul(x.unsqueeze(1), self.params_pos)
-        y_neg = torch.matmul(x.unsqueeze(1), self.params_neg)
-        z_pos = torch.pow(y_pos, self.pow) / self.k
-        z_neg = torch.pow(y_neg, self.pow) / self.k
-        return self.b - torch.matmul(z_neg, self.params_neg.transpose(1, 2)).sum() + torch.matmul(z_pos,
-                                                                                                  self.params_pos.transpose(
-                                                                                                      1, 2)).sum()
+        if self.relu:
+            act = nn.ReLU()
+            y1 = torch.matmul(x.unsqueeze(1), self.params_pos)
+            y2 = torch.matmul(x.unsqueeze(1), self.params_neg)
+            return self.b + torch.matmul(act(y1), self.params_pos.transpose(1, 2)).sum(dim=0) + torch.matmul(-act(y2), self.params_neg.transpose(1, 2)).sum(dim=0)
+        else:
+            y_pos = torch.matmul(x.unsqueeze(1), self.params_pos)
+            y_neg = torch.matmul(x.unsqueeze(1), self.params_neg)
+            z_pos = torch.pow(y_pos, self.pow) / self.k
+            z_neg = torch.pow(y_neg, self.pow) / self.k
+            return self.b - torch.matmul(z_neg, self.params_neg.transpose(1, 2)).sum() + torch.matmul(z_pos,
+                                                                                                      self.params_pos.transpose(
+                                                                                                          1, 2)).sum()
 
 
 class NeuralODE(nn.Module):
-    def __init__(self, Tp, Vq, tol=1e-3, solver=four_SymInt):
+    def __init__(self, Tp, Vq, solver=four_SymInt):
         super(NeuralODE, self).__init__()
         self.Tp = Tp
         self.Vq = Vq
-        self.tol = tol
+        self.tol = args.tol
         self.solver = solver
 
     def forward(self, p0, q0, t0, t1):
@@ -152,19 +187,18 @@ class Vq(nn.Module):
 
 
 
-def plot_TN(Tp_t, Vq_t, f_neur, truepq,data):
+def plot_TN(args, Tp_t, Vq_t, f_neur, truepq,data):
     q0 = torch.tensor([[1.]])
     p0 = torch.tensor([[1.]])
     t0 = torch.tensor([[0.0]])
     times = [t0]
     neurp0 = p0
     neurq0 = q0
-    plot_points = 200
-    DT = 4*np.pi
+
     neurpq = [torch.cat([p0, q0], dim=1)]
 
-    for i in range(plot_points):
-        dt = DT / (plot_points + 0.)
+    for i in range(args.plot_points):
+        dt = args.predicting_DT / (args.plot_points + 0.)
         t1 = torch.tensor([[dt * (i + 1)]])
         neurp1, neurq1 = f_neur(neurp0, neurq0, t0, t1)
         times.append(t1)
@@ -174,10 +208,10 @@ def plot_TN(Tp_t, Vq_t, f_neur, truepq,data):
         neurq0 = neurq1
     neurpq = torch.cat(neurpq)
     times = torch.cat(times)
-    plot_traj(obs=neurpq, times=times, trajs=truepq,training_data=data)
+    plot_traj(prediction=neurpq, times=times, true_trajs=truepq,training_data=data)
 
 
-def gen_truth(Tp_t, Vq_t,DT,plot_points):
+def gen_truth(args, Tp_t, Vq_t,DT,plot_points):
     q0 = torch.tensor([[1.]])
     p0 = torch.tensor([[1.]])
     t0 = torch.tensor([[0.0]])
@@ -189,7 +223,7 @@ def gen_truth(Tp_t, Vq_t,DT,plot_points):
     for i in range(plot_points):
         dt = DT / (plot_points + 0.)
         t1 = torch.tensor([[dt * (i + 1)]])
-        truep1, trueq1 = four_SymInt(truep0, trueq0, t0, t1, Tp_t, Vq_t, eps=0.001)
+        truep1, trueq1 = four_SymInt(truep0, trueq0, t0, t1, Tp_t, Vq_t, args.eps)
         times.append(t1)
         truepq.append(torch.cat([truep1, trueq1], dim=1))
         t0 = t1
@@ -199,12 +233,11 @@ def gen_truth(Tp_t, Vq_t,DT,plot_points):
     return truepq
 
 
-def gen_data(n_samples=15, data_type='train'):
+def gen_data(args,n_samples=15, data_type='train'):
     Tp_t = Tp()
     Vq_t = Vq()
     Tp_t.eval()
     Vq_t.eval()
-    DT = 0.01
     p0s = []
     q0s = []
     p1Ts = []
@@ -213,21 +246,21 @@ def gen_data(n_samples=15, data_type='train'):
         for i in range(n_samples):
             tstart = 0.
             t0 = torch.tensor([[tstart]])
-            t1 = torch.tensor([[tstart + DT]])
+            t1 = torch.tensor([[tstart + args.training_DT]])
             p0 = 4. * torch.rand(1, 1) - 2.
             q0 = 4. * torch.rand(1, 1) - 2.
-            p1T, q1T = four_SymInt(p0, q0, t0, t1, Tp_t, Vq_t, 0.001)
+            p1T, q1T = four_SymInt(p0, q0, t0, t1, Tp_t, Vq_t, args.eps)
             p0s.append(p0)
             q0s.append(q0)
             if data_type == 'train':
-                p1Ts.append(p1T)
-                q1Ts.append(q1T)
+                p1Ts.append(p1T+np.random.normal(0,args.noise))
+                q1Ts.append(q1T+np.random.normal(0,args.noise))
             else:
                 p1Ts.append(p1T)
                 q1Ts.append(q1T)
     p0s = torch.cat(p0s).detach().cpu().numpy()
     q0s = torch.cat(q0s).detach().cpu().numpy()
-    p1Ts = torch.cat(p1Ts).detach().cpu().numpy()        
+    p1Ts = torch.cat(p1Ts).detach().cpu().numpy()
     q1Ts = torch.cat(q1Ts).detach().cpu().numpy()
 
     data_root = os.path.join(os.path.dirname(os.path.realpath(__file__)))
@@ -259,28 +292,27 @@ class Dataset(torch.utils.data.Dataset):
         return self.p0.shape[0]
 
 
-def train():
+def train(args):
     torch.set_printoptions(precision=10)
     Tp_t = Tp()
     Vq_t = Vq()
     Tp_t.eval()
     Vq_t.eval()
-    f_neur = NeuralODE(TpTrained(), VqTrained())
-    truepq = gen_truth(Tp_t, Vq_t, 4*np.pi,200)
+    f_neur = NeuralODE(TpTrained(args), VqTrained(args))
+    truepq = gen_truth(args,Tp_t, Vq_t, args.predicting_DT,args.plot_points)
 
     plt.ion()
     plt.show()
-    n_steps = 300
-    DT = 0.01
-    training_data = gen_truth(Tp_t, Vq_t, DT,1)
-    optimizer = torch.optim.Adam(f_neur.parameters(), lr=0.002)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.8)
+
+    training_data = gen_truth(args, Tp_t, Vq_t,args.training_DT,3)
+    optimizer = torch.optim.Adam(f_neur.parameters(), lr=args.learning_rate)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
     data_loader = torch.utils.data.DataLoader(Dataset(data_type='train'), batch_size=1, shuffle=True)
     test_data_loader = torch.utils.data.DataLoader(Dataset(data_type='test'), batch_size=1, shuffle=True)
     plt.figure(figsize=(9, 6))
 
 
-    for i in range(n_steps):
+    for i in range(args.epochs):
         train_loss = 0
         train_sample = 0
         f_neur.train()
@@ -289,7 +321,7 @@ def train():
             optimizer.zero_grad()
             tstart = 0.
             t0 = torch.tensor([[tstart]])
-            t1 = torch.tensor([[tstart + DT]])
+            t1 = torch.tensor([[tstart + args.training_DT]])
             p1N, q1N = f_neur(p0, q0, t0, t1)
             loss = torch.nn.functional.l1_loss(p1N, p1T) + torch.nn.functional.l1_loss(q1N, q1T)
             loss.backward()
@@ -306,25 +338,27 @@ def train():
                 p0, q0, p1T, q1T = data_batch
                 tstart = 0.
                 t0 = torch.tensor([[tstart]])
-                t1 = torch.tensor([[tstart + DT]])
+                t1 = torch.tensor([[tstart + args.training_DT]])
                 p1N, q1N = f_neur(p0, q0, t0, t1)
                 loss = torch.nn.functional.l1_loss(p1N, p1T) + torch.nn.functional.l1_loss(q1N, q1T)
                 test_loss += loss.detach().cpu().item()
                 test_sample += 1
 
-        if i%10==0:
+        if (i+1) % args.print_every ==0:
             print("Epoch: {0} | Train Loss: {1} |  Test Loss: {2}".
                   format(i + 1,
                          format(train_loss / train_sample, '.2e'),
                          format(test_loss / test_sample, '.2e')))
             #visualization
             with torch.no_grad():
-                  plot_TN(Tp_t, Vq_t, f_neur, truepq, training_data)
+                  plot_TN(args, Tp_t, Vq_t, f_neur, truepq, training_data)
 
-#data generation
-gen_data(data_type='train')
-gen_data(data_type='test')
 
-#training
-train()
+if __name__ == "__main__":
+    args = get_args()
+    #data generation
+    gen_data(args, n_samples=args.training_samples, data_type='train')
+    gen_data(args, n_samples=args.testing_samples, data_type='test')
 
+    #training
+    train(args)
