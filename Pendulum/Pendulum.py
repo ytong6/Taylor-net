@@ -12,17 +12,17 @@ import torch.utils.data
 import argparse
 
 
-
 def get_args():
     parser = argparse.ArgumentParser(description=None)
     parser.add_argument('--training_DT', default=1e-2, type=float, help='training period')
-    parser.add_argument('--predicting_DT', default=20*np.pi, type=float, help='predicting period')
+    parser.add_argument('--predicting_DT', default=4*np.pi, type=float, help='predicting period')
     parser.add_argument('--learning_rate', default=2e-3, type=float, help='learning rate')
     parser.add_argument('--step_size', default=10, type=int, help='the period of learning rate decay')
     parser.add_argument('--gamma', default=0.8, type=float, help='multiplicative factor of learning rate decay')
     parser.add_argument('--epochs', default=300, type=int, help='number of epochs')
     parser.add_argument('--print_every', default=10, type=int, help='number of epochs between prints and plots')
-    parser.add_argument('--plot_points', default=1000, type=int, help='number of points on each plot')
+    parser.add_argument('--predicting_points', default=200, type=int, help='number of predicting points on each plot')
+    parser.add_argument('--training_points', default=3, type=int, help='number of training points on each plot')
     parser.add_argument('--training_samples', default=15, type=int, help='number of training samples')
     parser.add_argument('--testing_samples', default=100, type=int, help='number of testing samples')
     parser.add_argument('--noise', default=0, type=float, help='noise added on data')
@@ -77,7 +77,7 @@ def plot_traj(prediction=None, times=None, true_trajs=None, training_data=None):
     plt.clf()
     if prediction is not None:
         prediction = to_np(prediction)
-        plt.scatter(prediction[:, 0], prediction[:, 1], label='Prediction', c=to_np(times.reshape(-1)))
+        plt.scatter(prediction[:, 0], prediction[:, 1], label='Taylor-net Prediction', c=to_np(times.reshape(-1)))
 
     if training_data is not None:
         training_data= to_np(training_data)
@@ -88,7 +88,9 @@ def plot_traj(prediction=None, times=None, true_trajs=None, training_data=None):
 
         plt.plot(true_trajs[:, 0], true_trajs[:, 1], lw=1.5,c='C0', label='True trajectory',zorder=2)
 
-    plt.title("",fontsize=22)
+    plt.title("Pendulum problem prediction",fontsize=12)
+    plt.xlabel('p')
+    plt.ylabel('q')
     plt.legend()
     plt.draw()
     plt.pause(0.01)
@@ -164,7 +166,7 @@ class VqTrained(nn.Module):
 
 
 class NeuralODE(nn.Module):
-    def __init__(self, Tp, Vq, solver=four_SymInt):
+    def __init__(self, args, Tp, Vq, solver=four_SymInt):
         super(NeuralODE, self).__init__()
         self.Tp = Tp
         self.Vq = Vq
@@ -187,7 +189,7 @@ class Vq(nn.Module):
 
 
 
-def plot_TN(args, Tp_t, Vq_t, f_neur, truepq,data):
+def plot_TN(args, Tp_t, Vq_t, f_neur, truepq, data):
     q0 = torch.tensor([[1.]])
     p0 = torch.tensor([[1.]])
     t0 = torch.tensor([[0.0]])
@@ -197,8 +199,8 @@ def plot_TN(args, Tp_t, Vq_t, f_neur, truepq,data):
 
     neurpq = [torch.cat([p0, q0], dim=1)]
 
-    for i in range(args.plot_points):
-        dt = args.predicting_DT / (args.plot_points + 0.)
+    for i in range(args.predicting_points):
+        dt = args.predicting_DT / (args.predicting_points + 0.)
         t1 = torch.tensor([[dt * (i + 1)]])
         neurp1, neurq1 = f_neur(neurp0, neurq0, t0, t1)
         times.append(t1)
@@ -233,7 +235,7 @@ def gen_truth(args, Tp_t, Vq_t,DT,plot_points):
     return truepq
 
 
-def gen_data(args,n_samples=15, data_type='train'):
+def gen_data(args,n_samples, data_type='train'):
     Tp_t = Tp()
     Vq_t = Vq()
     Tp_t.eval()
@@ -298,13 +300,13 @@ def train(args):
     Vq_t = Vq()
     Tp_t.eval()
     Vq_t.eval()
-    f_neur = NeuralODE(TpTrained(args), VqTrained(args))
-    truepq = gen_truth(args,Tp_t, Vq_t, args.predicting_DT,args.plot_points)
+    f_neur = NeuralODE(args, TpTrained(args), VqTrained(args))
+    truepq = gen_truth(args,Tp_t, Vq_t, args.predicting_DT,args.predicting_points)
 
     plt.ion()
     plt.show()
 
-    training_data = gen_truth(args, Tp_t, Vq_t,args.training_DT,3)
+    training_data = gen_truth(args, Tp_t, Vq_t,args.training_DT, args.training_points)
     optimizer = torch.optim.Adam(f_neur.parameters(), lr=args.learning_rate)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
     data_loader = torch.utils.data.DataLoader(Dataset(data_type='train'), batch_size=1, shuffle=True)
