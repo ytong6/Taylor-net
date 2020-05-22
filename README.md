@@ -40,13 +40,15 @@ In order to train a Taylor-net:
 ## Results
 
 Pendulum Problem:
-![](https://github.com/ytong6/Taylor-net/blob/master/Figures/Figure_Pend.png)
+ <img src="https://github.com/ytong6/Taylor-net/blob/master/Figures/Figure_Pend.png" alt="pendulem" width="700" >
+
 
 Lotka-Volterra Problem:
-![](https://github.com/ytong6/Taylor-net/blob/master/Figures/Figure_LV.png)
+ <img src="https://github.com/ytong6/Taylor-net/blob/master/Figures/Figure_LV.png" alt="Lotka-Volterra" width="700" >
 
 Hénon-Heiles Problem:
-![](https://github.com/ytong6/Taylor-net/blob/master/Figures/Figure_HH.png)
+ <img src="https://github.com/ytong6/Taylor-net/blob/master/Figures/Figure_HH.png" alt="Hénon-Heiles" width="700" >
+
 
 ### Table of Losses
 | Problems      | Pendulum      | Lotka-Volterra| Hénon-Heiles | Kepler |
