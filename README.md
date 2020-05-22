@@ -1,9 +1,11 @@
 # Symplectic Taylor Neural Networks
 * Paper: https://arxiv.org/abs/2005.04986
 
-![](https://github.com/ytong6/Taylor-net/blob/master/Figures/net.png)
+![](https://github.com/ytong6/Taylor-net/blob/master/Figures/net2.png =250x)
 
-![](https://github.com/ytong6/Taylor-net/blob/master/Figures/net2.png)
+![](https://github.com/ytong6/Taylor-net/blob/master/Figures/net.png =250x)
+
+
 
 
 
