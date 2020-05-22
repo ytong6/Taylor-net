@@ -27,7 +27,7 @@ def get_args():
     parser.add_argument('--dimension', default=2, type=int, help='dimension of the problem')
     parser.add_argument('--nx', default=12, type=int, help=' the number of terms of the Taylor polynomial')
     parser.add_argument('--hidden_dim', default=32, type=int, help='dimension of the hidden layer')
-    parser.add_argument('--learning_rate', default=2e-3, type=float, help='learning rate')
+    parser.add_argument('--learning_rate', default=1e-3, type=float, help='learning rate')
     parser.add_argument('--step_size', default=10, type=int, help='the period of learning rate decay')
     parser.add_argument('--gamma', default=0.8, type=float, help='multiplicative factor of learning rate decay')
     parser.add_argument('--epochs', default=300, type=int, help='number of epochs')
