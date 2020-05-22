@@ -55,10 +55,10 @@ Hénon-Heiles Problem:
 | Testing loss | 1.39e-04  | 6.73e-05  | 9.44e-06  | 6.41e-05  |
 
 ## N-body
+   <img src="https://github.com/ytong6/Taylor-net/blob/master/Figures/n_body2.png" alt="3bodies" width="100" height="100">
 
-![](https://github.com/ytong6/Taylor-net/blob/master/Figures/n_body1.png)
+   <img src="https://github.com/ytong6/Taylor-net/blob/master/Figures/n_body1.png" alt="6bodies" width="100" height="100">
 
-![](https://github.com/ytong6/Taylor-net/blob/master/Figures/n_body2.png)
 
 ## Dependencies
 * PyTorch
