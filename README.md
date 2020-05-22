@@ -54,6 +54,12 @@ Hénon-Heiles Problem:
 | Training loss | 2.75e-05  | 2.37e-05  | 9.24e-06  | 7.29e-05 |
 | Testing loss | 1.39e-04  | 6.73e-05  | 9.44e-06  | 6.41e-05  |
 
+## N-body
+
+![](https://github.com/ytong6/Taylor-net/blob/master/Figures/n_body1.png)
+
+![](https://github.com/ytong6/Taylor-net/blob/master/Figures/n_body2.png)
+
 ## Dependencies
 * PyTorch
 * NumPy
