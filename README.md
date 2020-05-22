@@ -1,16 +1,15 @@
 # Symplectic Taylor Neural Networks
 * Paper: https://arxiv.org/abs/2005.04986
 
+
+## Summary
+We propose an effective and light-weighted learning algorithm, Symplectic Taylor Neural Networks (Taylor-nets), to conduct continuous, long-term predictions of a complex Hamiltonian dynamic system based on sparse, short-term observations. At the heart of our algorithm is a novel neural network architecture consisting of two sub-networks. Both are embedded with terms in the form of Taylor series expansion that are designed with a symmetric structure. The key mechanism underpinning our infrastructure is the strong expressiveness and special symmetric property of the Taylor series expansion, which can inherently accommodate the numerical fitting process of the spatial derivatives of the Hamiltonian as well as preserve its symplectic structure. We further incorporate a fourth-order symplectic integrator in conjunction with neural ODEs’ framework into our Taylor-net architecture to learn the continuous time evolution of the target systems while preserving their symplectic structures simultaneously. 
+
+
 ![](https://github.com/ytong6/Taylor-net/blob/master/Figures/net2.png)
 
 ![](https://github.com/ytong6/Taylor-net/blob/master/Figures/net.png)
 
-
-
-
-
-## Summary
-We propose an effective and light-weighted learning algorithm, Symplectic Taylor Neural Networks (Taylor-nets), to conduct continuous, long-term predictions of a complex Hamiltonian dynamic system based on sparse, short-term observations. At the heart of our algorithm is a novel neural network architecture consisting of two sub-networks. Both are embedded with terms in the form of Taylor series expansion that are designed with a symmetric structure. The key mechanism underpinning our infrastructure is the strong expressiveness and special symmetric property of the Taylor series expansion, which can inherently accommodate the numerical fitting process of the spatial derivatives of the Hamiltonian as well as preserve its symplectic structure. We further incorporate a fourth-order symplectic integrator in conjunction with neural ODEs’ framework into our Taylor-net architecture to learn the continuous time evolution of the target systems while preserving their symplectic structures simultaneously. 
 
 ## Usage
 We demonstrated the efficacy of our Tayler-net in predicting a broad spectrum of Hamiltonian dynamic systems, including the pendulum, the Lotka-Volterra, the Kepler, and the Hénon–Heiles systems.
