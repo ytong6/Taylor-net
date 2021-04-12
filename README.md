@@ -7,11 +7,15 @@ We propose an effective and light-weighted learning algorithm, Symplectic Taylor
 
 ![](https://github.com/ytong6/Taylor-net/blob/master/Figures/net.png)
 
+## Prerequisites
 
+Python should be installed in order to run the program. In a newly created virtual environmnent, run the following command:
 
+```
+pip install -r requirements.txt
+```
 
-
-
+All the required dependencies will then be installed.
 
 ## Usage
 We demonstrated the efficacy of our Tayler-net in predicting a broad spectrum of Hamiltonian dynamic systems, including the pendulum, the Lotka-Volterra, the Kepler, and the Hénon–Heiles systems.
